@@ -1,162 +1,90 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class PlaymodeManager : MonoBehaviour
 {
-    [Header("Scene Flow")]
-    [SerializeField] private string editSceneName = "EditModeScene";
-
-    [Header("Play References")]
-    [SerializeField] private PlayerControlUI playerControlUi;
+    [SerializeField] private PlayerController playerController;
+    [SerializeField] private PlayerControlUI controlUI;
     [SerializeField] private SpawnPosition spawnPosition;
-    [SerializeField] private Timer timer;
-    [SerializeField] private FinishScreen finishScreen;
-    [SerializeField] private PlayerController player;
 
-    [Header("Debug")]
-    [SerializeField] private bool enableDebugLogs = true;
+    private bool isInitialized;
 
     private void Awake()
     {
         ResolveReferences();
-        LogReferences("Awake");
     }
 
     private void Start()
     {
-        StartPlaySession();
+        Initialize();
     }
 
-    public void StartPlaySession()
+    public void Initialize()
     {
-        ResolveReferences();
-        Log("StartPlaySession() begin");
-
-        if (spawnPosition == null)
-        {
-            LogWarning("SpawnPosition not found in scene.");
+        if (isInitialized)
             return;
-        }
 
-        spawnPosition.Initialize();
+        ResolveReferences();
         EnsurePlayer();
 
-        if (player == null)
+        if (playerController != null)
         {
-            LogWarning("Player is still null after spawn attempt.");
-            return;
+            playerController.Initialize();
+            Debug.Log("[PlaymodeManager] PlayerController initialized: " + playerController.name, this);
+        }
+        else
+        {
+            Debug.LogError("[PlaymodeManager] PlayerController is null. Player spawn failed or PlayerController is missing on spawned object.", this);
         }
 
-        if (finishScreen != null)
-            finishScreen.Hide();
+        if (controlUI != null)
+            controlUI.Initialize(playerController);
+        else
+            Debug.LogWarning("[PlaymodeManager] PlayerControlUI is not found.", this);
 
-        player.Initialize();
-        player.enabled = true;
-
-        Rigidbody2D playerRb = player.GetComponent<Rigidbody2D>();
-        if (playerRb != null)
-            playerRb.linearVelocity = Vector2.zero;
-
-        if (playerControlUi != null)
-        {
-            playerControlUi.Initialize(player);
-            playerControlUi.gameObject.SetActive(true);
-        }
-
-        InitializeEnemies();
-
-        if (timer != null)
-            timer.ResetTimer(true);
-
-        Log("StartPlaySession() end");
-    }
-
-    public void RestartPlayMode()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-
-    public void BackToEditMode()
-    {
-        if (string.IsNullOrWhiteSpace(editSceneName))
-        {
-            LogWarning("Edit scene name is empty.");
-            return;
-        }
-
-        SceneManager.LoadScene(editSceneName);
-    }
-
-    private void ResolveReferences()
-    {
-        if (playerControlUi == null)
-            playerControlUi = FindFirstObjectByType<PlayerControlUI>(FindObjectsInactive.Include);
-
-        if (spawnPosition == null)
-            spawnPosition = FindFirstObjectByType<SpawnPosition>(FindObjectsInactive.Include);
-
-        if (timer == null)
-            timer = FindFirstObjectByType<Timer>(FindObjectsInactive.Include);
-
-        if (finishScreen == null)
-            finishScreen = FindFirstObjectByType<FinishScreen>(FindObjectsInactive.Include);
-
-        if (player == null)
-            player = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+        isInitialized = true;
     }
 
     private void EnsurePlayer()
     {
-        if (player == null)
+        if (playerController != null)
         {
-            GameObject spawned = spawnPosition.SpawnPlayer();
-            if (spawned != null)
-                player = spawned.GetComponent<PlayerController>();
+            Debug.Log("[PlaymodeManager] Existing player found: " + playerController.name, this);
+            return;
         }
 
-        if (player != null)
-            player.transform.SetPositionAndRotation(spawnPosition.transform.position, spawnPosition.transform.rotation);
-    }
-
-    private static void InitializeEnemies()
-    {
-        EnemyController[] enemies = FindObjectsByType<EnemyController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        for (int i = 0; i < enemies.Length; i++)
+        if (spawnPosition == null)
         {
-            if (enemies[i] != null)
-                enemies[i].Initialize();
+            Debug.LogError("[PlaymodeManager] SpawnPosition is null. Cannot spawn player.", this);
+            return;
         }
+
+        spawnPosition.Initialize();
+        GameObject spawnedPlayer = spawnPosition.SpawnPlayer();
+        if (spawnedPlayer == null)
+        {
+            Debug.LogError("[PlaymodeManager] SpawnPosition returned null. Player was not spawned.", this);
+            return;
+        }
+
+        playerController = spawnedPlayer.GetComponent<PlayerController>();
+        if (playerController == null)
+        {
+            Debug.LogError("[PlaymodeManager] Spawned player does not have PlayerController component: " + spawnedPlayer.name, spawnedPlayer);
+            return;
+        }
+
+        Debug.Log("[PlaymodeManager] Player spawned successfully: " + spawnedPlayer.name, spawnedPlayer);
     }
 
-    private void Log(string message)
+    private void ResolveReferences()
     {
-        if (!enableDebugLogs)
-            return;
+        if (spawnPosition == null)
+            spawnPosition = FindFirstObjectByType<SpawnPosition>(FindObjectsInactive.Include);
 
-        Debug.Log("[PlaymodeManager] " + message, this);
-    }
+        if (playerController == null)
+            playerController = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
 
-    private void LogWarning(string message)
-    {
-        if (!enableDebugLogs)
-            return;
-
-        Debug.LogWarning("[PlaymodeManager] " + message, this);
-    }
-
-    private void LogReferences(string context)
-    {
-        if (!enableDebugLogs)
-            return;
-
-        Debug.Log(
-            "[PlaymodeManager] " + context +
-            " | spawnPosition=" + (spawnPosition != null) +
-            " | player=" + (player != null) +
-            " | playerControlUi=" + (playerControlUi != null) +
-            " | timer=" + (timer != null) +
-            " | finishScreen=" + (finishScreen != null),
-            this
-        );
+        if (controlUI == null)
+            controlUI = FindFirstObjectByType<PlayerControlUI>(FindObjectsInactive.Include);
     }
 }

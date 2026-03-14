@@ -9,6 +9,9 @@ public class PlayerControlUI : MonoBehaviour
     [SerializeField] private Button moveLeftButton;
     [SerializeField] private Button moveRightButton;
     [SerializeField] private Button jumpButton;
+    [SerializeField] private bool isControlEnable = true;
+
+    public bool IsControlEnable => isControlEnable;
 
     private bool isInitialized;
 
@@ -36,6 +39,7 @@ public class PlayerControlUI : MonoBehaviour
             AddPointerEvent(moveRightButton, EventTriggerType.PointerExit, _ => OnMoveReleased());
         }
 
+        ApplyControlState();
         isInitialized = true;
     }
 
@@ -44,16 +48,29 @@ public class PlayerControlUI : MonoBehaviour
         player = value;
     }
 
+    public void SetControlEnable(bool value)
+    {
+        isControlEnable = value;
+        ApplyControlState();
+
+        if (!isControlEnable && player != null)
+            player.Move(0f);
+    }
+
     private void OnMoveLeftDown()
     {
-        if (player != null)
-            player.Move(-1f);
+        if (!isControlEnable || player == null)
+            return;
+
+        player.Move(-1f);
     }
 
     private void OnMoveRightDown()
     {
-        if (player != null)
-            player.Move(1f);
+        if (!isControlEnable || player == null)
+            return;
+
+        player.Move(1f);
     }
 
     private void OnMoveReleased()
@@ -64,8 +81,22 @@ public class PlayerControlUI : MonoBehaviour
 
     private void OnJumpPressed()
     {
-        if (player != null)
-            player.Jump();
+        if (!isControlEnable || player == null)
+            return;
+
+        player.Jump();
+    }
+
+    private void ApplyControlState()
+    {
+        if (moveLeftButton != null)
+            moveLeftButton.interactable = isControlEnable;
+
+        if (moveRightButton != null)
+            moveRightButton.interactable = isControlEnable;
+
+        if (jumpButton != null)
+            jumpButton.interactable = isControlEnable;
     }
 
     private static void AddPointerEvent(Button button, EventTriggerType type, UnityAction<BaseEventData> callback)

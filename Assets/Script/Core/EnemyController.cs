@@ -17,6 +17,7 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private string playerTag = "Player";
     [SerializeField] private Timer timer;
     [SerializeField] private FinishScreen finishScreen;
+    [SerializeField] private PlayerControlUI controlUI;
     [SerializeField] private bool disablePlayerControllerOnDefeat = true;
 
     private Rigidbody2D rb;
@@ -36,6 +37,9 @@ public class EnemyController : MonoBehaviour
 
         if (finishScreen == null)
             finishScreen = FindFirstObjectByType<FinishScreen>(FindObjectsInactive.Include);
+
+        if (controlUI == null)
+            controlUI = FindFirstObjectByType<PlayerControlUI>(FindObjectsInactive.Include);
     }
 
     public void Initialize()
@@ -115,6 +119,9 @@ public class EnemyController : MonoBehaviour
 
         if (finishScreen != null)
             finishScreen.ShowLose();
+
+        if (controlUI != null)
+            controlUI.SetControlEnable(false);
 
         if (disablePlayerControllerOnDefeat)
         {

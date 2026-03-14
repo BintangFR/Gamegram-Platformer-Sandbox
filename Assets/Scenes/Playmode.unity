@@ -1399,7 +1399,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &439142686
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1971,7 +1971,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &608495136
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2624,7 +2624,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1126932568}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c275a4b5b6241f14497b223c47ab349e, type: 3}
   m_Name: 
@@ -2643,7 +2643,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1126932568}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 574db247fe2829f41abea72cf318e466, type: 3}
   m_Name: 
@@ -2793,7 +2793,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1205539761
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3550,13 +3550,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a791728cca91ad5448035fce902f7200, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlaymodeManager
-  editSceneName: EditModeScene
-  playerControlUi: {fileID: 1126932573}
+  playerController: {fileID: 0}
+  controlUI: {fileID: 1126932573}
   spawnPosition: {fileID: 1394634311}
-  timer: {fileID: 39016142}
-  finishScreen: {fileID: 1500219825}
-  player: {fileID: 2608578928969569198, guid: 80c3033d7d29af2469fde9ebc7c037ee, type: 3}
-  enableDebugLogs: 1
 --- !u!4 &1577180084
 Transform:
   m_ObjectHideFlags: 0
@@ -3850,6 +3846,10 @@ PrefabInstance:
     - target: {fileID: 7120189578770081780, guid: 189846b05048d4248844b4f9e318b7c7, type: 3}
       propertyPath: m_Name
       value: Start
+      objectReference: {fileID: 0}
+    - target: {fileID: 7120189578770081780, guid: 189846b05048d4248844b4f9e318b7c7, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

@@ -8,6 +8,7 @@ public class Goal : MonoBehaviour
     [SerializeField] private string playerTag = "Player";
     [SerializeField] private Timer timer;
     [SerializeField] private FinishScreen finishScreen;
+    [SerializeField] private PlayerControlUI controlUI;
     [SerializeField] private bool disableAfterReached = true;
 
     [Header("Debug")]
@@ -29,6 +30,9 @@ public class Goal : MonoBehaviour
 
         if (finishScreen == null)
             finishScreen = FindFirstObjectByType<FinishScreen>(FindObjectsInactive.Include);
+
+        if (controlUI == null)
+            controlUI = FindFirstObjectByType<PlayerControlUI>(FindObjectsInactive.Include);
 
         if (enableDebugLogs)
             Debug.Log("[Goal] Awake | FinishScreenFound=" + (finishScreen != null), this);
@@ -55,6 +59,9 @@ public class Goal : MonoBehaviour
         {
             Debug.LogWarning("[Goal] FinishScreen is null.", this);
         }
+
+        if (controlUI != null)
+            controlUI.SetControlEnable(false);
 
         onGoalReached?.Invoke();
 
