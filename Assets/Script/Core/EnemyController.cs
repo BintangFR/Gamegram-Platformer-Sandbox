@@ -7,6 +7,7 @@ public class EnemyController : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 2f;
     [SerializeField] private LayerMask wallLayer = ~0;
+    [SerializeField] private float wallFlipCooldown = 0.08f;
 
     [Header("Stomp")]
     [SerializeField] private float stompBounceForce = 8f;
@@ -26,6 +27,7 @@ public class EnemyController : MonoBehaviour
     private bool isDead;
     private bool hasTriggeredLose;
     private bool isInitialized;
+    private float nextWallFlipTime;
 
     private void Awake()
     {
@@ -70,11 +72,30 @@ public class EnemyController : MonoBehaviour
         if (TryHandlePlayerDefeat(collision))
             return;
 
+        TryFlipOnWallCollision(collision);
+    }
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        if (isDead || hasTriggeredLose)
+            return;
+
+        TryFlipOnWallCollision(collision);
+    }
+
+    private void TryFlipOnWallCollision(Collision2D collision)
+    {
+        if (Time.time < nextWallFlipTime)
+            return;
+
         if (!IsInLayerMask(collision.gameObject.layer, wallLayer))
             return;
 
-        if (IsWallHit(collision))
-            FlipDirection();
+        if (!IsWallHit(collision))
+            return;
+
+        FlipDirection();
+        nextWallFlipTime = Time.time + wallFlipCooldown;
     }
 
     private bool TryHandleStomp(Collision2D collision)
@@ -162,7 +183,7 @@ public class EnemyController : MonoBehaviour
         for (int i = 0; i < contactCount; i++)
         {
             ContactPoint2D contact = collision.GetContact(i);
-            if (Mathf.Abs(contact.normal.x) > 0.5f)
+            if (Mathf.Abs(contact.normal.x) > 0.3f)
                 return true;
         }
 

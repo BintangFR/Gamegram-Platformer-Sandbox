@@ -2,9 +2,11 @@ using UnityEngine;
 
 public class PlaymodeManager : MonoBehaviour
 {
+    [SerializeField] private LevelConstructor levelConstructor;
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerControlUI controlUI;
     [SerializeField] private SpawnPosition spawnPosition;
+    [SerializeField] private bool forceSpawnAtStart = true;
 
     private bool isInitialized;
 
@@ -24,10 +26,30 @@ public class PlaymodeManager : MonoBehaviour
             return;
 
         ResolveReferences();
+
+        if (levelConstructor != null)
+        {
+            levelConstructor.ConstructLevelFromJson();
+
+            if (levelConstructor.SpawnPosition != null)
+                spawnPosition = levelConstructor.SpawnPosition;
+        }
+        else
+        {
+            Debug.LogWarning("[PlaymodeManager] LevelConstructor is not found.", this);
+        }
+
+        if (spawnPosition == null)
+            spawnPosition = FindFirstObjectByType<SpawnPosition>(FindObjectsInactive.Include);
+
+        if (forceSpawnAtStart)
+            playerController = null;
+
         EnsurePlayer();
 
         if (playerController != null)
         {
+            playerController.enabled = true;
             playerController.Initialize();
             Debug.Log("[PlaymodeManager] PlayerController initialized: " + playerController.name, this);
         }
@@ -37,18 +59,23 @@ public class PlaymodeManager : MonoBehaviour
         }
 
         if (controlUI != null)
+        {
             controlUI.Initialize(playerController);
+            controlUI.SetControlEnable(true);
+        }
         else
+        {
             Debug.LogWarning("[PlaymodeManager] PlayerControlUI is not found.", this);
+        }
 
         isInitialized = true;
     }
 
     private void EnsurePlayer()
     {
-        if (playerController != null)
+        if (playerController != null && playerController.gameObject.activeInHierarchy)
         {
-            Debug.Log("[PlaymodeManager] Existing player found: " + playerController.name, this);
+            Debug.Log("[PlaymodeManager] Existing active player found: " + playerController.name, this);
             return;
         }
 
@@ -78,6 +105,9 @@ public class PlaymodeManager : MonoBehaviour
 
     private void ResolveReferences()
     {
+        if (levelConstructor == null)
+            levelConstructor = FindFirstObjectByType<LevelConstructor>(FindObjectsInactive.Include);
+
         if (spawnPosition == null)
             spawnPosition = FindFirstObjectByType<SpawnPosition>(FindObjectsInactive.Include);
 

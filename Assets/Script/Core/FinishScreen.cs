@@ -29,6 +29,7 @@ public class FinishScreen : MonoBehaviour
     [SerializeField] private TextMeshProUGUI actionButtonLabel;
     [SerializeField] private string backToEditLabel = "Back to Edit Mode";
     [SerializeField] private string restartLabel = "Restart";
+    [SerializeField] private string editModeSceneName = "Editmode";
 
     [Header("Debug")]
     [SerializeField] private bool enableDebugLogs = true;
@@ -146,6 +147,14 @@ public class FinishScreen : MonoBehaviour
         if (isEditModeAvailable)
         {
             onBackToEditModeRequested?.Invoke();
+
+            if (!string.IsNullOrWhiteSpace(editModeSceneName))
+            {
+                SceneManager.LoadScene(editModeSceneName);
+                return;
+            }
+
+            Debug.LogWarning("[FinishScreen] Edit mode scene name is empty.", this);
             return;
         }
 
