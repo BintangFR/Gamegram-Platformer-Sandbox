@@ -112,18 +112,26 @@ public class MapTileEditor : MonoBehaviour
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
-        if (Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            Vector2 mousePosition = Mouse.current.position.ReadValue();
+        bool leftHeld = Mouse.current.leftButton.isPressed;
+        bool rightHeld = Mouse.current.rightButton.isPressed;
 
-            if (isEraserSelected)
-                EraseFromScreen(mousePosition);
-            else
-                PaintFromScreen(mousePosition);
+        if (!leftHeld && !rightHeld)
+            return;
+
+        Vector2 mousePosition = Mouse.current.position.ReadValue();
+
+        // Right hold = continuous erase drag
+        if (rightHeld)
+        {
+            EraseFromScreen(mousePosition);
+            return;
         }
 
-        if (Mouse.current.rightButton.wasPressedThisFrame)
-            EraseFromScreen(Mouse.current.position.ReadValue());
+        // Left hold = continuous paint drag (or erase if eraser tool is selected)
+        if (isEraserSelected)
+            EraseFromScreen(mousePosition);
+        else
+            PaintFromScreen(mousePosition);
     }
 
     public void SetSelectedTileType(int typeIndex)
@@ -261,7 +269,7 @@ public class MapTileEditor : MonoBehaviour
         RefreshPlacementCountsAndNotify();
     }
 
-    private string GetFilePath()
+    public string GetFilePath()
     {
         return Path.Combine(Application.persistentDataPath, outputFolder, fileName);
     }

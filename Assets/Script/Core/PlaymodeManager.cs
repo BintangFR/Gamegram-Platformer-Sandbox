@@ -7,20 +7,25 @@ public class PlaymodeManager : MonoBehaviour
     [SerializeField] private PlayerControlUI controlUI;
     [SerializeField] private SpawnPosition spawnPosition;
     [SerializeField] private bool forceSpawnAtStart = true;
+    [SerializeField] private bool initializeOnStart = true;
 
     private bool isInitialized;
 
-    private void Awake()
-    {
-        ResolveReferences();
-    }
-
     private void Start()
     {
-        Initialize();
+        if (!initializeOnStart)
+            return;
+
+        string pendingJson = Bootstrap.ConsumePendingLevelJson();
+        InitializeFromJson(pendingJson);
     }
 
     public void Initialize()
+    {
+        InitializeFromJson(null);
+    }
+
+    public void InitializeFromJson(string levelJson)
     {
         if (isInitialized)
             return;
@@ -29,7 +34,10 @@ public class PlaymodeManager : MonoBehaviour
 
         if (levelConstructor != null)
         {
-            levelConstructor.ConstructLevelFromJson();
+            if (!string.IsNullOrWhiteSpace(levelJson))
+                levelConstructor.ConstructLevelFromJsonString(levelJson);
+            else
+                levelConstructor.ConstructLevelFromJson();
 
             if (levelConstructor.SpawnPosition != null)
                 spawnPosition = levelConstructor.SpawnPosition;

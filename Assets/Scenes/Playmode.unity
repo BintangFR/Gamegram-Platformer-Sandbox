@@ -769,9 +769,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1126932572}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0}
-  m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: -48.7, y: 32.1}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 92.3, y: 32.1}
   m_SizeDelta: {x: 48, y: 48}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &225973643
@@ -2021,7 +2021,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &824693808
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2651,6 +2651,8 @@ MonoBehaviour:
   jumpButton: {fileID: 1150787173}
   isControlEnable: 1
   enableDebugLogs: 1
+  enableKeyboardInEditor: 1
+  jumpKey: 1
 --- !u!114 &1126932574
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2682,12 +2684,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 574db247fe2829f41abea72cf318e466, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InitGameApiChecker
-  initGameEndpoint: https://your-api/initgame
-  gameID: game_001
-  callOnBoot: 1
-  useLocalFallback: 1
+  modeKey: mode
+  levelIdKey: level_id
+  sandboxIdKey: sandbox_id
+  creatorIdKey: creator_id
+  fetchOnStart: 1
+  bootstrapEndpoint: http://127.0.0.1:8000/bootstrap
+  createSandboxEndpoint: http://127.0.0.1:8000/sandboxes/create
+  editModeSceneName: Editmode
+  playModeSceneName: Playmode
   cacheFolder: LevelData
-  cacheFileName: initgame_cache.json
+  fallbackFileName: level_01_tiles.json
+  useLevelIdAsFileName: 1
+  loadJSONlocallyDebug: 0
+  mode: 
+  levelId: 
+  sandboxId: 
+  creatorId: 
+  levelJsonUrl: 
+  cachedFilePath: 
   statusText: {fileID: 0}
 --- !u!1 &1150408540
 GameObject:
@@ -3746,6 +3761,7 @@ MonoBehaviour:
   controlUI: {fileID: 1126932573}
   spawnPosition: {fileID: 7821925024208213260, guid: 189846b05048d4248844b4f9e318b7c7, type: 3}
   forceSpawnAtStart: 1
+  initializeOnStart: 1
 --- !u!4 &1577180084
 Transform:
   m_ObjectHideFlags: 0
@@ -3785,6 +3801,7 @@ MonoBehaviour:
   startPrefab: {fileID: 7120189578770081780, guid: 189846b05048d4248844b4f9e318b7c7, type: 3}
   spawnedParent: {fileID: 0}
   editModeRoot: {fileID: 0}
+  loadJSONlocallyDebug: 0
 --- !u!1 &1754146548
 GameObject:
   m_ObjectHideFlags: 0
@@ -3795,7 +3812,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1754146550}
   - component: {fileID: 1754146551}
-  - component: {fileID: 1754146549}
   m_Layer: 0
   m_Name: Grid
   m_TagString: Untagged
@@ -3803,34 +3819,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1754146549
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1754146548}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4eb5ffbcd7a216d4d9598aafebc4f2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Groundeditor
-  worldCamera: {fileID: 0}
-  gridLayout: {fileID: 1754146551}
-  tilemap: {fileID: 422229452}
-  wallTile: {fileID: 11400000, guid: 3a8d49a8f08bf6a4fac5329c314d8515, type: 2}
-  enemyTile: {fileID: 11400000, guid: 89aaafb330f23934386e8d0912490289, type: 2}
-  coinTile: {fileID: 11400000, guid: 55398426b8178f64cb711bcde1af2cd3, type: 2}
-  startTile: {fileID: 11400000, guid: ac523af72cb7abf43a0ca3bec1051e67, type: 2}
-  goalTile: {fileID: 11400000, guid: 983f8f9c673aaf54db76351b5c79a491, type: 2}
-  maxStartTiles: 1
-  maxCoinTiles: 3
-  maxGoalTiles: 1
-  levelName: Level_01
-  fileName: level_01_tiles.json
-  outputFolder: LevelData
-  selectedTileType: 0
-  isEraserSelected: 0
 --- !u!4 &1754146550
 Transform:
   m_ObjectHideFlags: 0

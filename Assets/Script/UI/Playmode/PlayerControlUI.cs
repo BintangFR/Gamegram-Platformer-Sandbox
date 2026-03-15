@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class PlayerControlUI : MonoBehaviour
@@ -12,9 +13,14 @@ public class PlayerControlUI : MonoBehaviour
     [SerializeField] private bool isControlEnable = true;
     [SerializeField] private bool enableDebugLogs = true;
 
+    [Header("Editor Keyboard Control")]
+    [SerializeField] private bool enableKeyboardInEditor = true;
+    [SerializeField] private Key jumpKey = Key.Space;
+
     public bool IsControlEnable => isControlEnable;
 
     private bool isInitialized;
+    private bool isKeyboardMoveActive;
 
     public void Initialize(PlayerController value)
     {
@@ -60,6 +66,11 @@ public class PlayerControlUI : MonoBehaviour
         Log("Initialize completed.");
     }
 
+    private void Update()
+    {
+        HandleEditorKeyboardInput();
+    }
+
     public void SetPlayer(PlayerController value)
     {
         player = value;
@@ -75,6 +86,44 @@ public class PlayerControlUI : MonoBehaviour
 
         if (!isControlEnable && player != null)
             player.Move(0f);
+
+        if (!isControlEnable)
+            isKeyboardMoveActive = false;
+    }
+
+    private void HandleEditorKeyboardInput()
+    {
+        if (!Application.isEditor || !enableKeyboardInEditor)
+            return;
+
+        if (!isControlEnable || player == null)
+            return;
+
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null)
+            return;
+
+        float horizontal = 0f;
+
+        if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
+            horizontal -= 1f;
+
+        if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
+            horizontal += 1f;
+
+        if (horizontal != 0f)
+        {
+            player.Move(Mathf.Clamp(horizontal, -1f, 1f));
+            isKeyboardMoveActive = true;
+        }
+        else if (isKeyboardMoveActive)
+        {
+            player.Move(0f);
+            isKeyboardMoveActive = false;
+        }
+
+        if (keyboard[jumpKey].wasPressedThisFrame)
+            player.Jump();
     }
 
     private void OnMoveLeftDown()

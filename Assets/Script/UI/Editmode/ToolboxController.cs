@@ -1,5 +1,10 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -26,6 +31,11 @@ public class ToolboxController : MonoBehaviour
     [SerializeField] private Button saveAndPlayButton;
     [SerializeField] private string playModeSceneName = "Playmode";
 
+    [Header("Cloud Save")]
+    [SerializeField] private bool callCreateSandboxAfterSave = true;
+    [SerializeField] private string createSandboxEndpoint = "http://127.0.0.1:8000/sandboxes/create";
+    [SerializeField] private string editFormValue = "edit";
+
     [Header("Availability UI")]
     [SerializeField] private float availableAlpha = 1f;
     [SerializeField] private float unavailableAlpha = 0.5f;
@@ -37,6 +47,7 @@ public class ToolboxController : MonoBehaviour
 
     private Coroutine warningRoutine;
     private Color warningBaseColor = Color.white;
+    private bool isSaveRoutineRunning;
 
     private void Awake()
     {
@@ -173,7 +184,7 @@ public class ToolboxController : MonoBehaviour
         warningRoutine = StartCoroutine(AnimateWarningText(message));
     }
 
-    private System.Collections.IEnumerator AnimateWarningText(string message)
+    private IEnumerator AnimateWarningText(string message)
     {
         if (string.IsNullOrEmpty(message))
         {
@@ -198,7 +209,7 @@ public class ToolboxController : MonoBehaviour
         warningRoutine = null;
     }
 
-    private System.Collections.IEnumerator FadeWarningAlphaTo(float targetAlpha, float duration)
+    private IEnumerator FadeWarningAlphaTo(float targetAlpha, float duration)
     {
         float startAlpha = warningText.color.a;
         float elapsed = 0f;
@@ -253,8 +264,10 @@ public class ToolboxController : MonoBehaviour
         return false;
     }
 
-    private bool TrySaveMap()
+    private bool TrySaveMap(out string savedFilePath)
     {
+        savedFilePath = null;
+
         if (!CanSaveMap(out string warningMessage))
         {
             SetWarningText(warningMessage);
@@ -263,7 +276,68 @@ public class ToolboxController : MonoBehaviour
 
         SetWarningText(string.Empty);
         mapTileEditor.SaveMapToJson();
+        savedFilePath = mapTileEditor.GetFilePath();
         return true;
+    }
+
+    private IEnumerator SaveFlowRoutine(bool loadPlaySceneAfterSave)
+    {
+        if (isSaveRoutineRunning)
+            yield break;
+
+        isSaveRoutineRunning = true;
+
+        if (!TrySaveMap(out string savedFilePath))
+        {
+            isSaveRoutineRunning = false;
+            yield break;
+        }
+
+        if (callCreateSandboxAfterSave && !Bootstrap.LoadJSONLocallyDebug)
+            yield return UploadSavedLevelToSandbox(savedFilePath);
+
+        if (loadPlaySceneAfterSave && !string.IsNullOrWhiteSpace(playModeSceneName))
+            SceneManager.LoadScene(playModeSceneName);
+
+        isSaveRoutineRunning = false;
+    }
+
+    private IEnumerator UploadSavedLevelToSandbox(string levelFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(createSandboxEndpoint))
+        {
+            Debug.LogWarning("[ToolboxController] createSandboxEndpoint is empty.");
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(levelFilePath) || !File.Exists(levelFilePath))
+        {
+            Debug.LogWarning("[ToolboxController] Saved level file not found: " + levelFilePath);
+            yield break;
+        }
+
+        byte[] levelFileBytes = File.ReadAllBytes(levelFilePath);
+
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>
+        {
+            new MultipartFormDataSection("sandbox_id", Bootstrap.SandboxId ?? string.Empty),
+            new MultipartFormDataSection("current_user", Bootstrap.CreatorId ?? string.Empty),
+            new MultipartFormFileSection("level_file", levelFileBytes, Path.GetFileName(levelFilePath), "application/json")
+        };
+
+        using (UnityWebRequest request = UnityWebRequest.Post(createSandboxEndpoint, formData))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("[ToolboxController] /create failed: " + request.error, this);
+                SetWarningText("Saved locally, but upload failed.");
+                yield break;
+            }
+
+            Debug.Log("[ToolboxController] /create success: " + request.downloadHandler.text, this);
+        }
     }
 
     public void SelectWall()
@@ -316,17 +390,11 @@ public class ToolboxController : MonoBehaviour
 
     public void Save()
     {
-        TrySaveMap();
+        StartCoroutine(SaveFlowRoutine(false));
     }
 
     public void SaveAndPlay()
     {
-        if (!TrySaveMap())
-            return;
-
-        if (string.IsNullOrWhiteSpace(playModeSceneName))
-            return;
-
-        SceneManager.LoadScene(playModeSceneName);
+        StartCoroutine(SaveFlowRoutine(true));
     }
 }

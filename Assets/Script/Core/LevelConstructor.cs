@@ -49,6 +49,7 @@ public class LevelConstructor : MonoBehaviour
 
     [Header("Disable Edit Mode UI/Input In Playmode")]
     [SerializeField] private GameObject editModeRoot;
+    [SerializeField] private bool loadJSONlocallyDebug = false;
 
     private readonly List<GameObject> spawnedObjects = new List<GameObject>();
 
@@ -59,9 +60,6 @@ public class LevelConstructor : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
-        DisableEditModeSystems();
-        ResolveReferences();
-
         string path = GetFilePath();
         if (!File.Exists(path))
         {
@@ -70,6 +68,23 @@ public class LevelConstructor : MonoBehaviour
         }
 
         string json = File.ReadAllText(path);
+        ConstructLevelFromJsonString(json);
+    }
+
+    public void ConstructLevelFromJsonString(string json)
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            Debug.LogError("[LevelConstructor] Input JSON is empty.", this);
+            return;
+        }
+
+        DisableEditModeSystems();
+        ResolveReferences();
+
         LevelTileData data = JsonUtility.FromJson<LevelTileData>(json);
         if (data == null || data.tiles == null)
         {
@@ -226,7 +241,7 @@ public class LevelConstructor : MonoBehaviour
     {
         string targetFileName = fileName;
 
-        if (!string.IsNullOrWhiteSpace(Bootstrap.ActiveLevelFileName))
+        if (!loadJSONlocallyDebug && !string.IsNullOrWhiteSpace(Bootstrap.ActiveLevelFileName))
             targetFileName = Bootstrap.ActiveLevelFileName;
 
         return Path.Combine(Application.persistentDataPath, inputFolder, targetFileName);
