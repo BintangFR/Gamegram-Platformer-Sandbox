@@ -175,7 +175,7 @@ MonoBehaviour:
   cacheFolder: LevelData
   fallbackFileName: level_01_tiles.json
   useLevelIdAsFileName: 1
-  loadJSONlocallyDebug: 1
+  loadJSONlocallyDebug: 0
   mode: 
   levelId: 
   sandboxId: 

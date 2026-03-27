@@ -49,6 +49,9 @@ public class ToolboxController : MonoBehaviour
     private Color warningBaseColor = Color.white;
     private bool isSaveRoutineRunning;
 
+    // First, add a string variable to hold our local save at the class level
+    private string localSavedJsonString = string.Empty;
+
     private void Awake()
     {
         if (mapTileEditor == null)
@@ -293,13 +296,35 @@ public class ToolboxController : MonoBehaviour
             yield break;
         }
 
+        // Always save to memory directly for rapid playtesting
+        Bootstrap.LocalMemoryLevelJson = File.ReadAllText(savedFilePath);
+
         if (callCreateSandboxAfterSave && !Bootstrap.LoadJSONLocallyDebug)
+        {
             yield return UploadSavedLevelToSandbox(savedFilePath);
+        }
 
         if (loadPlaySceneAfterSave && !string.IsNullOrWhiteSpace(playModeSceneName))
             SceneManager.LoadScene(playModeSceneName);
 
         isSaveRoutineRunning = false;
+    }
+
+    [Serializable]
+    private class DateData
+    {
+        public string date;
+    }
+
+    private static void AddFormFieldIfHasValue(List<IMultipartFormSection> formData, string fieldName, string value)
+    {
+        if (string.IsNullOrWhiteSpace(fieldName))
+            return;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        formData.Add(new MultipartFormDataSection(fieldName, value));
     }
 
     private IEnumerator UploadSavedLevelToSandbox(string levelFilePath)
@@ -310,33 +335,29 @@ public class ToolboxController : MonoBehaviour
             yield break;
         }
 
-        if (string.IsNullOrWhiteSpace(levelFilePath) || !File.Exists(levelFilePath))
+        DateData dateData = new DateData { date = System.DateTime.UtcNow.ToString("O") };
+        string dateJson = JsonUtility.ToJson(dateData);
+        byte[] levelFileBytes = System.Text.Encoding.UTF8.GetBytes(dateJson);
+
+        if (levelFileBytes == null || levelFileBytes.Length == 0)
         {
-            Debug.LogWarning("[ToolboxController] Saved level file not found: " + levelFilePath);
+            Debug.LogError("[ToolboxController] level_file payload is empty.", this);
             yield break;
         }
 
-        byte[] levelFileBytes = File.ReadAllBytes(levelFilePath);
-
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>
-        {
-            new MultipartFormDataSection("sandbox_id", Bootstrap.SandboxId ?? string.Empty),
-            new MultipartFormDataSection("current_user", Bootstrap.CreatorId ?? string.Empty),
-            new MultipartFormFileSection("level_file", levelFileBytes, Path.GetFileName(levelFilePath), "application/json")
-        };
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
+        AddFormFieldIfHasValue(formData, "sandbox_id", Bootstrap.SandboxId);
+        AddFormFieldIfHasValue(formData, "current_user", Bootstrap.CreatorId);
+        formData.Add(new MultipartFormFileSection("level_file", levelFileBytes, "date.json", "application/json"));
 
         using (UnityWebRequest request = UnityWebRequest.Post(createSandboxEndpoint, formData))
         {
             yield return request.SendWebRequest();
 
             if (request.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError("[ToolboxController] /create failed: " + request.error, this);
-                SetWarningText("Saved locally, but upload failed.");
-                yield break;
-            }
-
-            Debug.Log("[ToolboxController] /create success: " + request.downloadHandler.text, this);
+                Debug.LogError("[ToolboxController] API save failed, continuing. Error: " + request.error, this);
+            else
+                Debug.Log("[ToolboxController] /create success: " + request.downloadHandler.text, this);
         }
     }
 

@@ -60,6 +60,14 @@ public class LevelConstructor : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
+        // NEW: Check if we have the level stored dynamically in memory.
+        if (!string.IsNullOrWhiteSpace(Bootstrap.LocalMemoryLevelJson))
+        {
+            ConstructLevelFromJsonString(Bootstrap.LocalMemoryLevelJson);
+            return;
+        }
+
+        // Fallback: Check if file physically exists on device mapping
         string path = GetFilePath();
         if (!File.Exists(path))
         {

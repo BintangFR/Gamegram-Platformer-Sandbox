@@ -63,6 +63,7 @@ public class Bootstrap : MonoBehaviour
 
     public static bool IsNoEditMode => string.Equals(Mode, "noedit", StringComparison.OrdinalIgnoreCase);
     public static bool LoadJSONLocallyDebug { get; private set; }
+    public static string LocalMemoryLevelJson { get; set; }
 
     public static string ConsumePendingLevelJson()
     {
@@ -133,6 +134,17 @@ public class Bootstrap : MonoBehaviour
             this);
     }
 
+    private static void AddFormFieldIfHasValue(List<IMultipartFormSection> formData, string fieldName, string value)
+    {
+        if (string.IsNullOrWhiteSpace(fieldName))
+            return;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        formData.Add(new MultipartFormDataSection(fieldName, value));
+    }
+
     private IEnumerator CallModeEndpointRoutine()
     {
         string endpoint = IsNoEditMode ? bootstrapEndpoint : createSandboxEndpoint;
@@ -142,30 +154,33 @@ public class Bootstrap : MonoBehaviour
             yield break;
         }
 
-        string levelFilePath = GetLocalLevelJsonFilePath();
-        if (!File.Exists(levelFilePath))
+        string fallbackJsonString = "{\"levelName\":\"Initial\",\"tiles\":[]}";
+
+        byte[] levelFileBytes = System.Text.Encoding.UTF8.GetBytes(fallbackJsonString);
+
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
+
+        AddFormFieldIfHasValue(formData, "sandbox_id", sandboxId);
+        AddFormFieldIfHasValue(formData, "current_user", creatorId);
+        AddFormFieldIfHasValue(formData, "edit", mode);
+        AddFormFieldIfHasValue(formData, "level_id", levelId);
+
+        if (levelFileBytes == null || levelFileBytes.Length == 0)
         {
-            Debug.LogError("[Bootstrap] level_file not found: " + levelFilePath, this);
-            UpdateStatusText("level_file missing.");
+            Debug.LogError("[Bootstrap] level_file is empty.");
             yield break;
         }
 
-        byte[] levelFileBytes = File.ReadAllBytes(levelFilePath);
-
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>
-        {
-            new MultipartFormDataSection("sandbox_id", sandboxId ?? string.Empty),
-            new MultipartFormDataSection("current_user", creatorId ?? string.Empty),
-            new MultipartFormDataSection("edit", mode ?? string.Empty),
-            new MultipartFormDataSection("level_id", levelId ?? string.Empty),
-            new MultipartFormFileSection("level_file", levelFileBytes, Path.GetFileName(levelFilePath), "application/json")
-        };
+        formData.Add(new MultipartFormFileSection("level_file", levelFileBytes, "level.json", "application/json"));
 
         UpdateStatusText("Sending form-data...");
 
         using (UnityWebRequest request = UnityWebRequest.Post(endpoint, formData))
         {
             yield return request.SendWebRequest();
+
+            string responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
+            Debug.Log("[Bootstrap] Endpoint Response: " + responseText, this);
 
             if (request.result != UnityWebRequest.Result.Success)
             {
@@ -174,11 +189,8 @@ public class Bootstrap : MonoBehaviour
                 yield break;
             }
 
-            string responseText = request.downloadHandler.text;
-
             if (!IsNoEditMode)
             {
-                Debug.Log("[Bootstrap] Sandbox create success: " + responseText, this);
                 UpdateStatusText("Sandbox created.");
                 RouteByModeAfterSuccess();
                 yield break;
@@ -186,7 +198,7 @@ public class Bootstrap : MonoBehaviour
 
             if (!TryExtractLevelJsonUrl(responseText, out string extractedUrl))
             {
-                Debug.LogError("[Bootstrap] Failed to parse level JSON URL from response: " + responseText, this);
+                Debug.LogError("[Bootstrap] Failed to parse level JSON URL from response.", this);
                 UpdateStatusText("Invalid bootstrap response.");
                 yield break;
             }
@@ -214,8 +226,18 @@ public class Bootstrap : MonoBehaviour
         SaveLevelJson(downloadedJson);
         PendingLevelJson = downloadedJson;
 
-        UpdateStatusText("Level JSON cached.");
+        UpdateStatusText("Level JSON cached in memory.");
         RouteByModeAfterSuccess();
+    }
+
+    // Update SaveLevelJson to stop doing disk IO and just hold it in memory
+    private void SaveLevelJson(string json)
+    {
+        // Save dynamically into memory instead of a physical file
+        LocalMemoryLevelJson = json;
+        PendingLevelJson = json;
+
+        Debug.Log("[Bootstrap] Level JSON saved directly to memory.", this);
     }
 
     private void RouteByModeAfterSuccess()
@@ -238,25 +260,6 @@ public class Bootstrap : MonoBehaviour
             localFileName = ActiveLevelFileName;
 
         return Path.Combine(Application.persistentDataPath, cacheFolder, localFileName);
-    }
-
-    private void SaveLevelJson(string json)
-    {
-        string fileName = useLevelIdAsFileName && !string.IsNullOrWhiteSpace(levelId)
-            ? BuildLevelFileName(levelId)
-            : fallbackFileName;
-
-        string folderPath = Path.Combine(Application.persistentDataPath, cacheFolder);
-        Directory.CreateDirectory(folderPath);
-
-        string fullPath = Path.Combine(folderPath, fileName);
-        File.WriteAllText(fullPath, json);
-
-        ActiveLevelFileName = fileName;
-        CachedLevelFilePath = fullPath;
-        cachedFilePath = fullPath;
-
-        Debug.Log("[Bootstrap] Level JSON saved: " + fullPath, this);
     }
 
     private static string BuildLevelFileName(string rawLevelId)
