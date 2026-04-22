@@ -33,8 +33,9 @@ public class ToolboxController : MonoBehaviour
 
     [Header("Cloud Save")]
     [SerializeField] private bool callCreateSandboxAfterSave = true;
-    [SerializeField] private string createSandboxEndpoint = "http://127.0.0.1:8000/sandboxes/create";
+    [SerializeField] private string createSandboxEndpoint = "https://gamegram-test.onrender.com/test/saveleveljson";
     [SerializeField] private string editFormValue = "edit";
+    [SerializeField] private string levelFileFormFieldName = "level_file";
 
     [Header("Availability UI")]
     [SerializeField] private float availableAlpha = 1f;
@@ -296,13 +297,14 @@ public class ToolboxController : MonoBehaviour
             yield break;
         }
 
-        // Always save to memory directly for rapid playtesting
-        Bootstrap.LocalMemoryLevelJson = File.ReadAllText(savedFilePath);
+        // Keep in memory if needed by play scene
+        if (File.Exists(savedFilePath))
+            Bootstrap.LocalMemoryLevelJson = File.ReadAllText(savedFilePath);
 
-        if (callCreateSandboxAfterSave && !Bootstrap.LoadJSONLocallyDebug)
-        {
+        // Always try server save after local save
+        // In debug mode, do not call backend save endpoint
+        if (callCreateSandboxAfterSave && !Bootstrap.IsDebugMode)
             yield return UploadSavedLevelToSandbox(savedFilePath);
-        }
 
         if (loadPlaySceneAfterSave && !string.IsNullOrWhiteSpace(playModeSceneName))
             SceneManager.LoadScene(playModeSceneName);
@@ -331,33 +333,46 @@ public class ToolboxController : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(createSandboxEndpoint))
         {
-            Debug.LogWarning("[ToolboxController] createSandboxEndpoint is empty.");
+            Debug.LogWarning("[ToolboxController] save endpoint is empty.");
             yield break;
         }
 
-        DateData dateData = new DateData { date = System.DateTime.UtcNow.ToString("O") };
-        string dateJson = JsonUtility.ToJson(dateData);
-        byte[] levelFileBytes = System.Text.Encoding.UTF8.GetBytes(dateJson);
+        if (string.IsNullOrWhiteSpace(levelFilePath) || !File.Exists(levelFilePath))
+        {
+            Debug.LogError("[ToolboxController] Saved level file not found: " + levelFilePath, this);
+            yield break;
+        }
 
+        byte[] levelFileBytes = File.ReadAllBytes(levelFilePath);
         if (levelFileBytes == null || levelFileBytes.Length == 0)
         {
-            Debug.LogError("[ToolboxController] level_file payload is empty.", this);
+            Debug.LogError("[ToolboxController] Saved level JSON file is empty.", this);
             yield break;
         }
 
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
-        AddFormFieldIfHasValue(formData, "sandbox_id", Bootstrap.SandboxId);
-        AddFormFieldIfHasValue(formData, "current_user", Bootstrap.CreatorId);
-        formData.Add(new MultipartFormFileSection("level_file", levelFileBytes, "date.json", "application/json"));
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>
+        {
+            new MultipartFormFileSection(
+                "level_file",
+                levelFileBytes,
+                Path.GetFileName(levelFilePath),
+                "application/json")
+        };
+
+        Debug.Log("[ToolboxController] Upload endpoint: " + createSandboxEndpoint, this);
+        Debug.Log("[ToolboxController] Field name: level_file", this);
+        Debug.Log("[ToolboxController] File name: " + Path.GetFileName(levelFilePath), this);
+        Debug.Log("[ToolboxController] File bytes: " + levelFileBytes.Length, this);
 
         using (UnityWebRequest request = UnityWebRequest.Post(createSandboxEndpoint, formData))
         {
             yield return request.SendWebRequest();
 
+            string responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
+            Debug.Log("[ToolboxController] savejsonfile status=" + request.responseCode + " response=" + responseText, this);
+
             if (request.result != UnityWebRequest.Result.Success)
-                Debug.LogError("[ToolboxController] API save failed, continuing. Error: " + request.error, this);
-            else
-                Debug.Log("[ToolboxController] /create success: " + request.downloadHandler.text, this);
+                Debug.LogError("[ToolboxController] savejsonfile failed, continuing. Error: " + request.error, this);
         }
     }
 

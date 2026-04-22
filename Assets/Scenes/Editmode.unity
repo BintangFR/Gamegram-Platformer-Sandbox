@@ -2130,6 +2130,9 @@ MonoBehaviour:
   saveButton: {fileID: 592198715}
   saveAndPlayButton: {fileID: 20059973}
   playModeSceneName: Playmode
+  callCreateSandboxAfterSave: 1
+  createSandboxEndpoint: https://gamegram-test.onrender.com/test/saveleveljson
+  editFormValue: edit
   availableAlpha: 1
   unavailableAlpha: 0.5
   warningFadeInDuration: 0.2
