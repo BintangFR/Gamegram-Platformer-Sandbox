@@ -33,7 +33,7 @@ public class ToolboxController : MonoBehaviour
 
     [Header("Cloud Save")]
     [SerializeField] private bool callCreateSandboxAfterSave = true;
-    [SerializeField] private string createSandboxEndpoint = "https://gamegram-test.onrender.com/test/saveleveljson";
+    private string createSandboxEndpoint = "https://gamegram-test.onrender.com/test/create";
     [SerializeField] private string editFormValue = "edit";
     [SerializeField] private string levelFileFormFieldName = "level_file";
 
@@ -301,10 +301,11 @@ public class ToolboxController : MonoBehaviour
         if (File.Exists(savedFilePath))
             Bootstrap.LocalMemoryLevelJson = File.ReadAllText(savedFilePath);
 
-        // Always try server save after local save
-        // In debug mode, do not call backend save endpoint
-        if (callCreateSandboxAfterSave && !Bootstrap.IsDebugMode)
-            yield return UploadSavedLevelToSandbox(savedFilePath);
+        // Always try server save after local save.
+        if (callCreateSandboxAfterSave)
+        {
+            yield return UploadSavedLevelToSandbox(savedFilePath, createSandboxEndpoint);
+        }
 
         if (loadPlaySceneAfterSave && !string.IsNullOrWhiteSpace(playModeSceneName))
             SceneManager.LoadScene(playModeSceneName);
@@ -329,9 +330,9 @@ public class ToolboxController : MonoBehaviour
         formData.Add(new MultipartFormDataSection(fieldName, value));
     }
 
-    private IEnumerator UploadSavedLevelToSandbox(string levelFilePath)
+    private IEnumerator UploadSavedLevelToSandbox(string levelFilePath, string endpoint)
     {
-        if (string.IsNullOrWhiteSpace(createSandboxEndpoint))
+        if (string.IsNullOrWhiteSpace(endpoint))
         {
             Debug.LogWarning("[ToolboxController] save endpoint is empty.");
             yield break;
@@ -343,33 +344,35 @@ public class ToolboxController : MonoBehaviour
             yield break;
         }
 
-        byte[] levelFileBytes = File.ReadAllBytes(levelFilePath);
-        if (levelFileBytes == null || levelFileBytes.Length == 0)
+        string levelJson = File.ReadAllText(levelFilePath);
+        if (string.IsNullOrWhiteSpace(levelJson))
         {
-            Debug.LogError("[ToolboxController] Saved level JSON file is empty.", this);
+            Debug.LogError("[ToolboxController] Saved level file is empty.", this);
             yield break;
         }
 
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>
-        {
-            new MultipartFormFileSection(
-                "level_file",
-                levelFileBytes,
-                Path.GetFileName(levelFilePath),
-                "application/json")
-        };
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
 
-        Debug.Log("[ToolboxController] Upload endpoint: " + createSandboxEndpoint, this);
-        Debug.Log("[ToolboxController] Field name: level_file", this);
-        Debug.Log("[ToolboxController] File name: " + Path.GetFileName(levelFilePath), this);
-        Debug.Log("[ToolboxController] File bytes: " + levelFileBytes.Length, this);
+        string finalSandboxId = string.IsNullOrEmpty(Bootstrap.SandboxId) ? "test_sandbox_456" : Bootstrap.SandboxId;
+        string finalCreatorId = string.IsNullOrEmpty(Bootstrap.CreatorId) ? "test_creator_789" : Bootstrap.CreatorId;
 
-        using (UnityWebRequest request = UnityWebRequest.Post(createSandboxEndpoint, formData))
+        AddFormFieldIfHasValue(formData, "sandbox_id", finalSandboxId);
+        AddFormFieldIfHasValue(formData, "creator_id", finalCreatorId); 
+        
+        // Add as a string data section to avoid the boundary parser 'unknown error'
+        AddFormFieldIfHasValue(formData, "level_file", levelJson);
+
+        LogApiRequest(
+            endpoint,
+            "sandbox_id=" + finalSandboxId + "\n" +
+            "creator_id=" + finalCreatorId + "\n" +
+            "level_file (chars)=" + levelJson.Length);
+
+        using (UnityWebRequest request = UnityWebRequest.Post(endpoint, formData))
         {
             yield return request.SendWebRequest();
 
-            string responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
-            Debug.Log("[ToolboxController] savejsonfile status=" + request.responseCode + " response=" + responseText, this);
+            LogApiResponse(request);
 
             if (request.result != UnityWebRequest.Result.Success)
                 Debug.LogError("[ToolboxController] savejsonfile failed, continuing. Error: " + request.error, this);
@@ -432,5 +435,47 @@ public class ToolboxController : MonoBehaviour
     public void SaveAndPlay()
     {
         StartCoroutine(SaveFlowRoutine(true));
+    }
+
+    private static bool IsSameEndpoint(string left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            return false;
+
+        return string.Equals(
+            left.TrimEnd('/'),
+            right.TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string TruncateForLog(string value, int maxLength = 800)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        if (value.Length <= maxLength)
+            return value;
+
+        return value.Substring(0, maxLength) + "...(truncated)";
+    }
+
+    private void LogApiRequest(string endpoint, string detail)
+    {
+        Debug.Log(
+            "[ToolboxController][API][Request] POST " + endpoint + "\n" +
+            detail,
+            this);
+    }
+
+    private void LogApiResponse(UnityWebRequest request)
+    {
+        string responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
+
+        Debug.Log(
+            "[ToolboxController][API][Response] " + request.method + " " + request.url + "\n" +
+            "HTTP " + request.responseCode + " | Result=" + request.result + "\n" +
+            "Error: " + (string.IsNullOrEmpty(request.error) ? "-" : request.error) + "\n" +
+            "Body: " + TruncateForLog(responseText),
+            this);
     }
 }

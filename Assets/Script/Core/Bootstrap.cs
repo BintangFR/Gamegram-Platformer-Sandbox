@@ -32,14 +32,12 @@ public class Bootstrap : MonoBehaviour
 
     [Header("Launch Query Keys")]
     [SerializeField] private string modeKey = "mode";
-    [SerializeField] private string levelIdKey = "level_id";
     [SerializeField] private string sandboxIdKey = "sandbox_id";
     [SerializeField] private string creatorIdKey = "creator_id";
 
     [Header("API Endpoints")]
     [SerializeField] private bool fetchOnStart = true;
     [SerializeField] private string bootstrapEndpoint = "https://gamegram-test.onrender.com/test/getjson";
-    [SerializeField] private string createSandboxEndpoint = "http://127.0.0.1:8000/sandboxes/create";
 
     [Header("Scene Routing")]
     [SerializeField] private string editModeSceneName = "Editmode";
@@ -50,14 +48,11 @@ public class Bootstrap : MonoBehaviour
     [SerializeField] private string fallbackFileName = "level_01_tiles.json";
     [SerializeField] private bool useLevelIdAsFileName = true;
 
-    [Header("Debug")]
-    [SerializeField] private bool loadJSONlocallyDebug = false;
-
     [Header("Parsed Values (Read Only)")]
-    [SerializeField] private string mode;
-    [SerializeField] private string levelId;
-    [SerializeField] private string sandboxId;
-    [SerializeField] private string creatorId;
+    // Defaults can be kept here for easy Editor testing without URL parameters
+    [SerializeField] private string mode = "edit";
+    private string sandboxId = "test_sandbox_456";
+    private string creatorId = "test_creator_789";
     [SerializeField] private string levelJsonUrl;
     [SerializeField] private string cachedFilePath;
 
@@ -65,7 +60,6 @@ public class Bootstrap : MonoBehaviour
     [SerializeField] private TextMeshProUGUI statusText;
 
     public static string Mode { get; private set; }
-    public static string LevelId { get; private set; }
     public static string SandboxId { get; private set; }
     public static string CreatorId { get; private set; }
     public static string ActiveLevelFileName { get; private set; }
@@ -73,7 +67,6 @@ public class Bootstrap : MonoBehaviour
     public static string PendingLevelJson { get; private set; }
 
     public static bool IsNoEditMode => string.Equals(Mode, "noedit", StringComparison.OrdinalIgnoreCase);
-    public static bool LoadJSONLocallyDebug { get; private set; }
     public static string LocalMemoryLevelJson { get; set; }
     public static bool IsDebugMode { get; private set; }
 
@@ -87,33 +80,13 @@ public class Bootstrap : MonoBehaviour
     private void Awake()
     {
         IsDebugMode = debugMode;
-
+        
         ParseLaunchUrl();
 
         if (IsDebugMode)
             ApplyDebugOverrides();
 
         UpdateStatusText("Launch params parsed.");
-    }
-
-    private void Start()
-    {
-        if (IsDebugMode)
-        {
-            PendingLevelJson = null;
-            ActiveLevelFileName = null;
-            CachedLevelFilePath = null;
-            cachedFilePath = null;
-
-            UpdateStatusText("Debug mode active. API calls skipped.");
-            RouteByModeAfterSuccess();
-            return;
-        }
-
-        if (!fetchOnStart)
-            return;
-
-        StartCoroutine(CallModeEndpointRoutine());
     }
 
     private void ApplyDebugOverrides()
@@ -124,11 +97,18 @@ public class Bootstrap : MonoBehaviour
             mode = "edit";
 
         Mode = mode;
-        LevelId = levelId;
         SandboxId = sandboxId;
         CreatorId = creatorId;
 
-        Debug.Log("[Bootstrap] Debug override active | mode=" + Mode, this);
+        Debug.Log("[Bootstrap] Debug override active | overridden_mode=" + Mode, this);
+    }
+
+    private void Start()
+    {
+        if (!fetchOnStart)
+            return;
+
+        StartCoroutine(CallModeEndpointRoutine());
     }
 
     private void ParseLaunchUrl()
@@ -143,9 +123,6 @@ public class Bootstrap : MonoBehaviour
         if (TryGetQueryParam(url, modeKey, out string parsedMode))
             mode = parsedMode;
 
-        if (TryGetQueryParam(url, levelIdKey, out string parsedLevelId))
-            levelId = parsedLevelId;
-
         if (TryGetQueryParam(url, sandboxIdKey, out string parsedSandboxId))
             sandboxId = parsedSandboxId;
 
@@ -153,13 +130,11 @@ public class Bootstrap : MonoBehaviour
             creatorId = parsedCreatorId;
 
         Mode = mode;
-        LevelId = levelId;
         SandboxId = sandboxId;
         CreatorId = creatorId;
 
         Debug.Log(
             "[Bootstrap] mode=" + Mode +
-            " | level_id=" + LevelId +
             " | sandbox_id=" + SandboxId +
             " | creator_id=" + CreatorId,
             this);
@@ -178,34 +153,47 @@ public class Bootstrap : MonoBehaviour
 
     private IEnumerator CallModeEndpointRoutine()
     {
-        // noedit: get JSON directly from backend endpoint (GET)
+        // Only call getjson if started in play mode ("noedit")
         if (IsNoEditMode)
         {
+            if (string.IsNullOrWhiteSpace(sandboxId))
+            {
+                Debug.LogError("[Bootstrap] sandbox_id is empty. Cannot build bootstrap URL.");
+                UpdateStatusText("Missing sandbox id.");
+                yield break; 
+            }
+
             if (string.IsNullOrWhiteSpace(bootstrapEndpoint))
             {
-                Debug.LogError("[Bootstrap] bootstrapEndpoint is empty.");
+                Debug.LogError("[Bootstrap] bootstrapEndpoint is empty. Set it in the Inspector.");
+                UpdateStatusText("Missing bootstrap endpoint.");
                 yield break;
             }
 
-            UpdateStatusText("Fetching level JSON...");
+            string urlParams = "?sandbox_id=" + Uri.EscapeDataString(sandboxId) + "&creator_id=" + Uri.EscapeDataString(creatorId);
+            string urlToCall = bootstrapEndpoint + urlParams;
 
+            UpdateStatusText("Fetching level JSON...");
             string responseText;
-            using (UnityWebRequest request = UnityWebRequest.Get(bootstrapEndpoint))
+
+            using (UnityWebRequest request = UnityWebRequest.Get(urlToCall))
             {
+                LogApiRequest("GET", urlToCall);
+
                 yield return request.SendWebRequest();
 
                 responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
-                Debug.Log("[Bootstrap] GET response: " + responseText, this);
+                LogApiResponse(request);
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     Debug.LogError("[Bootstrap] GET failed: " + request.error, this);
-                    UpdateStatusText("GET failed.");
+                    UpdateStatusText("GET failed. Transitioning anyway...");
+                    RouteByModeAfterSuccess();
                     yield break;
                 }
             }
 
-            // If backend returns JSON string directly, use it immediately
             string trimmed = string.IsNullOrWhiteSpace(responseText) ? string.Empty : responseText.Trim();
             if (trimmed.StartsWith("{", StringComparison.Ordinal) && trimmed.EndsWith("}", StringComparison.Ordinal))
             {
@@ -216,23 +204,28 @@ public class Bootstrap : MonoBehaviour
                 yield break;
             }
 
-            // Optional fallback: backend returned URL instead of JSON
             if (!TryExtractLevelJsonUrl(responseText, out string extractedUrl))
             {
                 Debug.LogError("[Bootstrap] Response is neither level JSON nor URL.", this);
-                UpdateStatusText("Invalid level response.");
+                UpdateStatusText("Invalid level response. Transitioning anyway...");
+                RouteByModeAfterSuccess();
                 yield break;
             }
 
             string downloadedJson;
             using (UnityWebRequest levelRequest = UnityWebRequest.Get(extractedUrl))
             {
+                LogApiRequest("GET", extractedUrl);
+
                 yield return levelRequest.SendWebRequest();
+
+                LogApiResponse(levelRequest);
 
                 if (levelRequest.result != UnityWebRequest.Result.Success)
                 {
                     Debug.LogError("[Bootstrap] Level JSON download failed: " + levelRequest.error, this);
-                    UpdateStatusText("Level JSON download failed.");
+                    UpdateStatusText("Level JSON download failed. Transitioning anyway...");
+                    RouteByModeAfterSuccess();
                     yield break;
                 }
 
@@ -243,43 +236,11 @@ public class Bootstrap : MonoBehaviour
             PendingLevelJson = downloadedJson;
             UpdateStatusText("Level JSON received.");
             RouteByModeAfterSuccess();
-            yield break;
         }
-
-        // edit/create flow: keep existing multipart POST
-        if (string.IsNullOrWhiteSpace(createSandboxEndpoint))
+        else
         {
-            Debug.LogError("[Bootstrap] createSandboxEndpoint is empty.");
-            yield break;
-        }
-
-        string fallbackJsonString = "{\"levelName\":\"Initial\",\"tiles\":[]}";
-        byte[] levelFileBytes = System.Text.Encoding.UTF8.GetBytes(fallbackJsonString);
-
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
-        AddFormFieldIfHasValue(formData, "sandbox_id", sandboxId);
-        AddFormFieldIfHasValue(formData, "current_user", creatorId);
-        AddFormFieldIfHasValue(formData, "edit", mode);
-        AddFormFieldIfHasValue(formData, "level_id", levelId);
-        formData.Add(new MultipartFormFileSection("level_file", levelFileBytes, "level.json", "application/json"));
-
-        UpdateStatusText("Sending form-data...");
-
-        using (UnityWebRequest request = UnityWebRequest.Post(createSandboxEndpoint, formData))
-        {
-            yield return request.SendWebRequest();
-
-            string responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
-            Debug.Log("[Bootstrap] Endpoint Response: " + responseText, this);
-
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError("[Bootstrap] Form-data request failed: " + request.error, this);
-                UpdateStatusText("Form-data request failed.");
-                yield break;
-            }
-
-            UpdateStatusText("Sandbox created.");
+            // Edit mode: Skip fetching JSON and just go straight to the Edit scene
+            UpdateStatusText("Edit mode: skipping GET JSON in Bootstrap.");
             RouteByModeAfterSuccess();
         }
     }
@@ -304,26 +265,6 @@ public class Bootstrap : MonoBehaviour
         }
 
         SceneManager.LoadScene(targetScene);
-    }
-
-    private string GetLocalLevelJsonFilePath()
-    {
-        string localFileName = fallbackFileName;
-
-        if (!string.IsNullOrWhiteSpace(ActiveLevelFileName))
-            localFileName = ActiveLevelFileName;
-
-        return Path.Combine(Application.persistentDataPath, cacheFolder, localFileName);
-    }
-
-    private static string BuildLevelFileName(string rawLevelId)
-    {
-        string safe = rawLevelId;
-        char[] invalid = Path.GetInvalidFileNameChars();
-        for (int i = 0; i < invalid.Length; i++)
-            safe = safe.Replace(invalid[i], '_');
-
-        return safe + ".json";
     }
 
     private static bool TryExtractLevelJsonUrl(string responseText, out string url)
@@ -372,7 +313,6 @@ public class Bootstrap : MonoBehaviour
 
         statusText.text =
             "mode=" + mode + "\n" +
-            "level_id=" + levelId + "\n" +
             "sandbox_id=" + sandboxId + "\n" +
             "creator_id=" + creatorId + "\n" +
             message;
@@ -411,5 +351,57 @@ public class Bootstrap : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static string TruncateForLog(string value, int maxLength = 4000)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        if (value.Length <= maxLength)
+            return value;
+
+        return value.Substring(0, maxLength) + "\n\n...[TRUNCATED: original length " + value.Length + "]";
+    }
+
+    private static string GetResponseBody(UnityWebRequest request)
+    {
+        if (request == null || request.downloadHandler == null)
+            return string.Empty;
+
+        return request.downloadHandler.text ?? string.Empty;
+    }
+
+    private void LogApiRequest(string method, string url, string payload = null)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            Debug.Log("[Bootstrap][API][Request]\nURL: " + method + " " + url, this);
+            return;
+        }
+
+        Debug.Log(
+            "[Bootstrap][API][Request]\nURL: " + method + " " + url + "\n" +
+            "Payload:\n" + TruncateForLog(payload),
+            this);
+    }
+
+    private void LogApiResponse(UnityWebRequest request)
+    {
+        string body = GetResponseBody(request);
+        bool isSuccess = request.result == UnityWebRequest.Result.Success;
+        string statusLabel = isSuccess ? "[SUCCESS]" : "[FAILED]";
+
+        string logMessage =
+            "[Bootstrap][API][Response] " + statusLabel + "\n" +
+            "URL: " + request.method + " " + request.url + "\n" +
+            "Status: HTTP " + request.responseCode + " | UnityResult: " + request.result + "\n" +
+            "Error Details: " + (string.IsNullOrEmpty(request.error) ? "None" : request.error) + "\n" +
+            "Response Body:\n" + TruncateForLog(body);
+
+        if (isSuccess)
+            Debug.Log(logMessage, this);
+        else
+            Debug.LogError(logMessage, this); 
     }
 }
