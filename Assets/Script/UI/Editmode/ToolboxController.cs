@@ -33,7 +33,10 @@ public class ToolboxController : MonoBehaviour
 
     [Header("Cloud Save")]
     [SerializeField] private bool callCreateSandboxAfterSave = true;
-    private string createSandboxEndpoint = "https://gamegram-test.onrender.com/test/create";
+    //127.0.0.1:8000\sandboxes\create
+    //127.0.0.1:8000\bootstrap\getjson
+    //private string createSandboxEndpoint = "https://gamegram-test.onrender.com/test/create2";
+    private string createSandboxEndpoint = "http://127.0.0.1:8000/sandboxes/create";
     [SerializeField] private string editFormValue = "edit";
     [SerializeField] private string levelFileFormFieldName = "level_file";
 
@@ -319,6 +322,14 @@ public class ToolboxController : MonoBehaviour
         public string date;
     }
 
+    [Serializable]
+    private class SavePayload
+    {
+        public string sandbox_id;
+        public string creator_id;
+        public string level_file;
+    }
+
     private static void AddFormFieldIfHasValue(List<IMultipartFormSection> formData, string fieldName, string value)
     {
         if (string.IsNullOrWhiteSpace(fieldName))
@@ -351,22 +362,21 @@ public class ToolboxController : MonoBehaviour
             yield break;
         }
 
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
-
         string finalSandboxId = string.IsNullOrEmpty(Bootstrap.SandboxId) ? "test_sandbox_456" : Bootstrap.SandboxId;
         string finalCreatorId = string.IsNullOrEmpty(Bootstrap.CreatorId) ? "test_creator_789" : Bootstrap.CreatorId;
 
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
+
+        // Send everything as standard form-data string fields
         AddFormFieldIfHasValue(formData, "sandbox_id", finalSandboxId);
         AddFormFieldIfHasValue(formData, "creator_id", finalCreatorId); 
-        
-        // Add as a string data section to avoid the boundary parser 'unknown error'
         AddFormFieldIfHasValue(formData, "level_file", levelJson);
 
         LogApiRequest(
             endpoint,
             "sandbox_id=" + finalSandboxId + "\n" +
             "creator_id=" + finalCreatorId + "\n" +
-            "level_file (chars)=" + levelJson.Length);
+            "level_file chars=" + levelJson.Length);
 
         using (UnityWebRequest request = UnityWebRequest.Post(endpoint, formData))
         {

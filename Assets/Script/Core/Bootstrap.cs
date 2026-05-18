@@ -31,13 +31,15 @@ public class Bootstrap : MonoBehaviour
     [SerializeField] private DebugStartMode debugStartMode = DebugStartMode.UseLaunchMode;
 
     [Header("Launch Query Keys")]
-    [SerializeField] private string modeKey = "mode";
-    [SerializeField] private string sandboxIdKey = "sandbox_id";
-    [SerializeField] private string creatorIdKey = "creator_id";
+    private string modeKey = "mode";
+    private string gameIdKey = "game_id";
+    private string sandboxIdKey = "sandbox_id";
+    private string creatorIdKey = "creator_id";
 
     [Header("API Endpoints")]
     [SerializeField] private bool fetchOnStart = true;
-    [SerializeField] private string bootstrapEndpoint = "https://gamegram-test.onrender.com/test/getjson";
+    //private string bootstrapEndpoint = "https://gamegram-test.onrender.com/test/getjson";
+    private string bootstrapEndpoint = "http://127.0.0.1:8000/bootstrap/getjson";
 
     [Header("Scene Routing")]
     [SerializeField] private string editModeSceneName = "Editmode";
@@ -49,10 +51,10 @@ public class Bootstrap : MonoBehaviour
     [SerializeField] private bool useLevelIdAsFileName = true;
 
     [Header("Parsed Values (Read Only)")]
-    // Defaults can be kept here for easy Editor testing without URL parameters
     [SerializeField] private string mode = "edit";
-    private string sandboxId = "test_sandbox_456";
-    private string creatorId = "test_creator_789";
+    private string gameId = "";
+    private string sandboxId = "";
+    private string creatorId = "";
     [SerializeField] private string levelJsonUrl;
     [SerializeField] private string cachedFilePath;
 
@@ -60,6 +62,7 @@ public class Bootstrap : MonoBehaviour
     [SerializeField] private TextMeshProUGUI statusText;
 
     public static string Mode { get; private set; }
+    public static string GameId { get; private set; }
     public static string SandboxId { get; private set; }
     public static string CreatorId { get; private set; }
     public static string ActiveLevelFileName { get; private set; }
@@ -81,10 +84,14 @@ public class Bootstrap : MonoBehaviour
     {
         IsDebugMode = debugMode;
         
+        // Parse params first
         ParseLaunchUrl();
 
+        // If debug mode is ON, override the URL params with our test defaults
         if (IsDebugMode)
+        {
             ApplyDebugOverrides();
+        }
 
         UpdateStatusText("Launch params parsed.");
     }
@@ -96,7 +103,12 @@ public class Bootstrap : MonoBehaviour
         else if (debugStartMode == DebugStartMode.Edit)
             mode = "edit";
 
+        gameId = "1234";
+        sandboxId = "test_sandbox_456";
+        creatorId = "test_creator_789";
+
         Mode = mode;
+        GameId = gameId;
         SandboxId = sandboxId;
         CreatorId = creatorId;
 
@@ -123,6 +135,9 @@ public class Bootstrap : MonoBehaviour
         if (TryGetQueryParam(url, modeKey, out string parsedMode))
             mode = parsedMode;
 
+        if (TryGetQueryParam(url, gameIdKey, out string parsedGameId))
+            gameId = parsedGameId;
+
         if (TryGetQueryParam(url, sandboxIdKey, out string parsedSandboxId))
             sandboxId = parsedSandboxId;
 
@@ -130,11 +145,13 @@ public class Bootstrap : MonoBehaviour
             creatorId = parsedCreatorId;
 
         Mode = mode;
+        GameId = gameId;
         SandboxId = sandboxId;
         CreatorId = creatorId;
 
         Debug.Log(
             "[Bootstrap] mode=" + Mode +
+            " | gameid=" + GameId +
             " | sandbox_id=" + SandboxId +
             " | creator_id=" + CreatorId,
             this);
@@ -156,13 +173,6 @@ public class Bootstrap : MonoBehaviour
         // Only call getjson if started in play mode ("noedit")
         if (IsNoEditMode)
         {
-            if (string.IsNullOrWhiteSpace(sandboxId))
-            {
-                Debug.LogError("[Bootstrap] sandbox_id is empty. Cannot build bootstrap URL.");
-                UpdateStatusText("Missing sandbox id.");
-                yield break; 
-            }
-
             if (string.IsNullOrWhiteSpace(bootstrapEndpoint))
             {
                 Debug.LogError("[Bootstrap] bootstrapEndpoint is empty. Set it in the Inspector.");
@@ -170,15 +180,16 @@ public class Bootstrap : MonoBehaviour
                 yield break;
             }
 
-            string urlParams = "?sandbox_id=" + Uri.EscapeDataString(sandboxId) + "&creator_id=" + Uri.EscapeDataString(creatorId);
-            string urlToCall = bootstrapEndpoint + urlParams;
+            // Using game_id based on backend expectations for the GET param
+            string separator = bootstrapEndpoint.Contains("?") ? "&" : "?";
+            string requestUrl = bootstrapEndpoint + separator + "game_id=" + Uri.EscapeDataString(gameId);
 
             UpdateStatusText("Fetching level JSON...");
             string responseText;
 
-            using (UnityWebRequest request = UnityWebRequest.Get(urlToCall))
+            using (UnityWebRequest request = UnityWebRequest.Get(requestUrl))
             {
-                LogApiRequest("GET", urlToCall);
+                LogApiRequest("GET", requestUrl);
 
                 yield return request.SendWebRequest();
 
@@ -313,6 +324,7 @@ public class Bootstrap : MonoBehaviour
 
         statusText.text =
             "mode=" + mode + "\n" +
+            "gameid=" + gameId + "\n" +
             "sandbox_id=" + sandboxId + "\n" +
             "creator_id=" + creatorId + "\n" +
             message;

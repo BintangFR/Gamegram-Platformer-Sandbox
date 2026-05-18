@@ -165,12 +165,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Bootstrap
   debugMode: 0
   debugStartMode: 1
-  modeKey: mode
-  gameIdKey: gameid
-  sandboxIdKey: sandbox_id
-  creatorIdKey: creator_id
   fetchOnStart: 1
-  bootstrapEndpoint: https://gamegram-test.onrender.com/test/getjson
   editModeSceneName: Editmode
   playModeSceneName: Playmode
   cacheFolder: LevelData
